@@ -22,20 +22,26 @@ async function getBlockTxCount(lastStartingTime){
         return
     }
 
-    var blockNum = await web3.eth.getBlockNumber()-200
+    var blockNum = await web3.eth.getBlockNumber()
     if(lastBlockNum!==blockNum){
         lastBlockNum = blockNum
         var block = await web3.eth.getBlock(blockNum)
         var blockMiner = await getBlockValidator(blockNum)
         console.log(blockNum , " : ",block.transactions.length)
-
+        var txpoolStats = await getTxPoolStatus()
         var blockS = {
             blockNumber : blockNum,
             timestamp : block.timestamp,
             txCount : block.transactions.length,
-            gas : block.gasUsed,
-            blockMiner : blockMiner,
+            gasUsed : block.gasUsed,
+            gasLimit : block.gasLimit,
+            baseFee : block.baseFeePerGas,
+            pendingTxAfterBlock : txpoolStats.pending,
+            queuedTxAfterBlock : txpoolStats.queued,
+            blockMiner : blockMiner
         }
+
+        
     
         fs.appendFile(`./output/out-${lastStartingTime}.json`, '\n'+JSON.stringify(blockS) , function (err) {
             if (err) throw err;
@@ -64,6 +70,25 @@ async function getBlockValidator(blockNum){
     })
 
     return blockMiner
+}
+
+async function getTxPoolStatus(){
+    var txpoolStats = {}
+    await axios.post(HTTPSWEB3 ,{
+        jsonrpc: '2.0',
+        method: 'txpool_status',
+        params: [],
+        id: 1
+    }, {
+        headers: {
+        'Content-Type': 'application/json',
+        },
+    }).then((response) => {
+        txpoolStats.pending = parseInt(response.data.result.pending, 16); 
+        txpoolStats.queued = parseInt(response.data.result.queued, 16); 
+    })
+
+    return txpoolStats
 }
 
 async function iteration(lastStartingTime){
