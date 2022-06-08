@@ -10,6 +10,8 @@ var web3 = new Web3(Web3.givenProvider || WSWEB3);
 const timer = ms => new Promise(res => setTimeout(res, ms))
 
 var lastBlockNum = 0
+var lastBlockS = {}
+
 
 async function getBlockTxCount(lastStartingTime){
 
@@ -24,11 +26,52 @@ async function getBlockTxCount(lastStartingTime){
 
     var blockNum = await web3.eth.getBlockNumber()
     if(lastBlockNum!==blockNum){
+        var pendingCountMoreThanLastBlockGasFee = 0
         lastBlockNum = blockNum
-        var block = await web3.eth.getBlock(blockNum)
+
+        var contentPromises = []
+        contentPromises.push(web3.eth.getBlock(blockNum))
+        contentPromises.push(getTxPoolContent())
+
+        var data = await Promise.all(contentPromises)
+        var block = data[0]
+        var txpoolContent = data[1]
+
         var blockMiner = await getBlockValidator(blockNum)
         console.log(blockNum , " : ",block.transactions.length)
+
+        // txpool calc start
         var txpoolStats = await getTxPoolStatus()
+        var pending = txpoolContent.pending
+
+        // eslint-disable-next-line no-unused-vars
+        for (var [key, value] of Object.entries(pending)) {
+            
+            // eslint-disable-next-line no-unused-vars
+            for (var [nonce, txobject] of Object.entries(value)) {
+                
+                var maxFeePerGas = txobject.maxFeePerGas
+                var gasPriceToCheck 
+
+                if(maxFeePerGas===undefined){
+                    gasPriceToCheck = txobject.gasPrice
+                    
+                }else{
+                    gasPriceToCheck = maxFeePerGas
+                }
+
+                gasPriceToCheck = parseInt(gasPriceToCheck, 16)
+                
+                if(lastBlockS.baseFee!==undefined){
+                    if((gasPriceToCheck-30000000000)>lastBlockS.baseFee){
+                        pendingCountMoreThanLastBlockGasFee += 1
+                    }
+                }
+                
+            }
+        }
+
+        // txpool calc end
         var blockS = {
             blockNumber : blockNum,
             timestamp : block.timestamp,
@@ -38,7 +81,8 @@ async function getBlockTxCount(lastStartingTime){
             baseFee : block.baseFeePerGas,
             pendingTxAfterBlock : txpoolStats.pending,
             queuedTxAfterBlock : txpoolStats.queued,
-            blockMiner : blockMiner
+            pendingCountMoreThanLastBlockGasFee : pendingCountMoreThanLastBlockGasFee,
+            blockMiner : blockMiner,
         }
 
         
@@ -47,6 +91,8 @@ async function getBlockTxCount(lastStartingTime){
             if (err) throw err;
             console.log('Added', JSON.stringify(blockS));
         });
+
+        lastBlockS = JSON.parse(JSON.stringify(blockS)) 
 
         return blockS
     } 
@@ -91,9 +137,27 @@ async function getTxPoolStatus(){
     return txpoolStats
 }
 
+async function getTxPoolContent(){
+    
+    var res 
+    await axios.post(HTTPSWEB3 ,{
+        jsonrpc: '2.0',
+        method: 'txpool_content',
+        params: [],
+        id: 1
+    }, {
+        headers: {
+        'Content-Type': 'application/json',
+        },
+    }).then((response) => {
+        res = response
+    })
+    return res.data.result
+}
+
 async function iteration(lastStartingTime){
 
-    while ((Math.floor(new Date().getTime() / 1000))-lastStartingTime <= 600){
+    while ((Math.floor(new Date().getTime() / 1000))-lastStartingTime <= 1800){
         await getBlockTxCount(lastStartingTime)
         await timer(300)
     }
