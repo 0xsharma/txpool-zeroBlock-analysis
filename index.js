@@ -10,7 +10,6 @@ var web3 = new Web3(Web3.givenProvider || WSWEB3);
 const timer = ms => new Promise(res => setTimeout(res, ms))
 
 var lastBlockNum = 0
-var lastBlockS = {}
 
 
 async function getBlockTxCount(lastStartingTime){
@@ -62,8 +61,8 @@ async function getBlockTxCount(lastStartingTime){
 
                 gasPriceToCheck = parseInt(gasPriceToCheck, 16)
                 
-                if(lastBlockS.baseFee!==undefined){
-                    if((gasPriceToCheck-30000000000)>lastBlockS.baseFee){
+                if(block.baseFee!==undefined){
+                    if((gasPriceToCheck-30000000000)>block.baseFee){
                         pendingCountMoreThanLastBlockGasFee += 1
                     }
                 }
@@ -87,12 +86,23 @@ async function getBlockTxCount(lastStartingTime){
 
         
     
-        fs.appendFile(`./output/out-${lastStartingTime}.json`, '\n'+JSON.stringify(blockS) , function (err) {
+        fs.appendFile(`./output/out-${lastStartingTime}.csv`, '\n'+
+        blockS.blockNumber + ',' +
+        blockS.timestamp + ',' +
+        blockS.txCount + ',' +
+        blockS.gasUsed + ',' +
+        blockS.gasLimit + ',' +
+        blockS.baseFee + ',' +
+        blockS.pendingTxAfterBlock + ',' +
+        blockS.queuedTxAfterBlock + ',' +
+        blockS.pendingCountMoreThanLastBlockGasFee + ',' +
+        blockS.blockMiner
+        , function (err) {
             if (err) throw err;
             console.log('Added', JSON.stringify(blockS));
         });
 
-        lastBlockS = JSON.parse(JSON.stringify(blockS)) 
+        
 
         return blockS
     } 
@@ -168,6 +178,12 @@ async function iteration(lastStartingTime){
 async function main(){
 
     var lastStartingTime = Math.floor(new Date().getTime() / 1000)
+    fs.appendFile(`./output/out-${lastStartingTime}.csv`, 
+    `blockNumber, timestamp, txCount, gasUsed, gasLimit, baseFee, pendingTxAfterBlock, queuedTxAfterBlock, pendingCountMoreThanLastBlockGasFee, blockMiner`
+    , function (err) {
+        if (err) throw err;
+        console.log('Initialised');
+    });
 
     // eslint-disable-next-line no-constant-condition
     while(true){
