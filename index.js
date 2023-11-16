@@ -60,9 +60,16 @@ async function getBlockTxCount(lastStartingTime){
                 }
 
                 gasPriceToCheck = parseInt(gasPriceToCheck, 16)
+
+                var prioFee = txobject.maxPriorityFeePerGas
+                if(prioFee===undefined){
+                    prioFee = 30000000000
+                }else{
+                    prioFee = parseInt(prioFee, 16)
+                }
                 
                 if(block.baseFee!==undefined){
-                    if((gasPriceToCheck-30000000000)>block.baseFee){
+                    if((gasPriceToCheck-prioFee)>=block.baseFee){
                         pendingCountMoreThanLastBlockGasFee += 1
                     }
                 }
